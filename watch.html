@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Friendly Streamer</title>
+  <link rel="stylesheet" href="css/player.css">
+</head>
+<body>
+  <!-- Lobby: shown when no stream is selected -->
+  <main id="lobby" hidden>
+    <h1>Who's live</h1>
+    <ul id="streams" class="streams"></ul>
+    <p id="empty" class="muted">Nobody is streaming right now. This list refreshes on its own.</p>
+    <form id="join" class="join">
+      <input id="joinKey" placeholder="or type a stream name" autocomplete="off" required>
+      <button>Watch</button>
+    </form>
+  </main>
+
+  <!-- Player -->
+  <section id="stage" hidden>
+    <video id="video" autoplay playsinline muted></video>
+
+    <div id="status" class="status"><div class="spinner"></div><span id="statusText">Connecting…</span></div>
+    <button id="unmute" class="unmute" hidden>🔊 Click to unmute</button>
+
+    <div id="stats" class="stats" hidden></div>
+
+    <div id="controls" class="controls">
+      <button id="back" title="Back to stream list">←</button>
+      <span id="title" class="title"></span>
+      <span id="live" class="live" hidden>LIVE</span>
+      <span class="spacer"></span>
+      <button id="muteBtn" title="Mute (M)">🔇</button>
+      <input id="volume" type="range" min="0" max="1" step="0.01" value="1" title="Volume">
+      <button id="statsBtn" title="Stats for nerds (S)">📊</button>
+      <button id="fsBtn" title="Fullscreen (F)">⛶</button>
+    </div>
+  </section>
+
+  <script type="module" src="js/watch.js"></script>
+</body>
+</html>
