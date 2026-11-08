@@ -7,18 +7,26 @@
   <link rel="stylesheet" href="css/player.css">
 </head>
 <body>
-  <main id="lobby">
+  <!-- Lobby: shown when no stream is selected -->
+  <main id="lobby" hidden>
     <h1>Who's live</h1>
     <ul id="streams" class="streams"></ul>
     <p id="empty" class="muted">Nobody is streaming right now. This list refreshes on its own.</p>
-    <p id="unsupported" class="muted" hidden>This Discord client can't decode video here (WebCodecs missing). Use the browser link instead.</p>
+    <form id="join" class="join">
+      <input id="joinKey" placeholder="or type a stream name" autocomplete="off" required>
+      <button>Watch</button>
+    </form>
   </main>
 
+  <!-- Player -->
   <section id="stage" hidden>
-    <canvas id="canvas"></canvas>
+    <video id="video" autoplay playsinline muted></video>
+
     <div id="status" class="status"><div class="spinner"></div><span id="statusText">Connecting…</span></div>
-    <button id="unmute" class="unmute">🔊 Click to unmute</button>
+    <button id="unmute" class="unmute" hidden>🔊 Click to unmute</button>
+
     <div id="stats" class="stats" hidden></div>
+
     <div id="controls" class="controls">
       <button id="back" title="Back to stream list">←</button>
       <span id="title" class="title"></span>
@@ -31,6 +39,6 @@
     </div>
   </section>
 
-  <script type="module" src="js/activity.js"></script>
+  <script type="module" src="js/watch.js"></script>
 </body>
 </html>

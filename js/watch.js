@@ -43,8 +43,12 @@ async function refreshLobby() {
   ul.replaceChildren(...live.map(({ server, key, viewers: n }) => {
     const li = document.createElement("li");
     const a = document.createElement("a");
-    a.href = urlFor(key, server.url);
-    a.onclick = (e) => { e.preventDefault(); go(key, server.url); };
+    if (server.isSelf) {
+      a.href = urlFor(key);
+      a.onclick = (e) => { e.preventDefault(); go(key); };
+    } else {
+      a.href = server.watchUrl(key); // open the stream on its host's own https:// page
+    }
     const dot = document.createElement("span"); dot.className = "dot";
     const name = document.createElement("span"); name.className = "name"; name.textContent = key;
     const viewers = document.createElement("span"); viewers.className = "muted";

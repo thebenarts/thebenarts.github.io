@@ -25,6 +25,8 @@ h1 { font-size: 22px; margin: 0 0 16px; }
 .streams a:hover { background: var(--panel-2); }
 .streams .name { font-weight: 600; flex: 1; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--live); }
+.diag { margin-top: 24px; padding: 10px 12px; border-radius: 8px; background: var(--panel); color: var(--muted);
+  font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
 .join { display: flex; gap: 8px; margin-top: 24px; }
 .join input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 6px; border: 0; background: var(--panel); }
 .join button, .unmute { padding: 10px 16px; border: 0; border-radius: 6px; background: var(--accent); cursor: pointer; }

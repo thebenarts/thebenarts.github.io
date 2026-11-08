@@ -1,9 +1,7 @@
 {
-    "clientId":  "1568772005665317004",
     "servers":  [
                     {
                         "name":  "Ben",
-                        "prefix":  "/s/ben",
                         "url":  "https://bensfriendlystream.duckdns.org:8080"
                     }
                 ]

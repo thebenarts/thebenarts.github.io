@@ -1,13 +1,8 @@
-// Multi-server support shared by the browser player and the Discord Activity.
+// Multi-server support for the stream list.
 //
-// The server this page came from lists its friends' servers in /activity-config.json
-// (from config/servers.json). Each server is reached:
-//   - in a normal browser: directly at its https:// URL (Broadcast Box allows cross-origin requests)
-//   - inside Discord:      through its URL Mapping prefix, e.g. /.proxy/s/anna (Discord blocks
-//                          direct requests to other sites)
-// Viewers always connect straight to the server that hosts the stream.
-
-export const inDiscord = new URLSearchParams(location.search).has("frame_id");
+// The front site (GitHub Pages) has a servers.json listing every streamer's server, each with its
+// own https:// address. A page served by a streaming server itself has no servers.json, so it
+// just lists that server ("self"). Viewers always connect straight to the server hosting a stream.
 
 async function fetchWithTimeout(url, ms) {
   const ctl = new AbortController();
@@ -17,62 +12,40 @@ async function fetchWithTimeout(url, ms) {
 }
 
 export class Server {
-  constructor({ name, prefix = "", url = "" }) {
+  constructor({ name, url = "" }) {
     this.name = name;
-    this.prefix = prefix;
-    this.url = url;
-    this.isSelf = !prefix && !url;
-    this.base = null; // resolved HTTP base once a request succeeds
+    this.url = url.replace(/\/+$/, "");
+    this.isSelf = !this.url;
   }
 
-  // Where this server's API might live, in the order we try them.
-  candidates() {
-    if (this.isSelf) return [""];
-    if (inDiscord) return [`/.proxy${this.prefix}`, this.prefix];
-    return [this.url];
+  /** Link to watch a stream on this server's own player page. */
+  watchUrl(key) {
+    return `${this.url}/watch.html?key=${encodeURIComponent(key)}`;
   }
 
   /** Live streams on this server ([] if it's offline or unreachable). */
   async live() {
-    for (const b of this.base !== null ? [this.base] : this.candidates()) {
-      try {
-        const res = await fetchWithTimeout(`${b}/api/status`, 3000);
-        if (!res.ok) continue;
-        const data = await res.json(); // a wrong path returns the HTML app page -> throws
-        if (data !== null && !Array.isArray(data)) continue;
-        this.base = b;
-        return (data || []).filter((s) => (s.videoTracks || []).length).map((s) => ({ server: this, key: s.streamKey, viewers: (s.sessions || []).length }));
-      } catch {}
+    try {
+      const res = await fetchWithTimeout(`${this.url}/api/status`, 3000);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data
+        .filter((s) => (s.videoTracks || []).length)
+        .map((s) => ({ server: this, key: s.streamKey, viewers: (s.sessions || []).length }));
+    } catch {
+      return [];
     }
-    return [];
-  }
-
-  /** WebSocket URL candidates for the relay feed (used by the Discord Activity). */
-  wsUrls(key) {
-    const path = `/ws/${encodeURIComponent(key)}`;
-    const toWs = (base) => {
-      if (/^https?:/.test(base)) return base.replace(/^http/, "ws") + path;
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      return `${proto}://${location.host}${base}${path}`;
-    };
-    if (this.isSelf && inDiscord) return [toWs("/.proxy"), toWs("")];
-    const bases = this.base !== null ? [this.base] : this.candidates();
-    return bases.map(toWs);
   }
 }
 
-/**
- * Loads the Discord app ID and the server list.
- * Served by a streaming server's relay: that server comes first with no prefix/url ("self").
- * Served by the static site (GitHub Pages): every server has its own prefix and url, no "self".
- */
+/** Loads the server list: servers.json on the front site, otherwise just this server. */
 export async function loadConfig() {
   let cfg = {};
-  // Relative on purpose: the static site may live in a sub-folder (github.io/<repo>/).
-  try { cfg = await (await fetchWithTimeout("activity-config.json", 3000)).json(); } catch {}
+  try { cfg = await (await fetchWithTimeout("servers.json", 3000)).json(); } catch {}
   const list = Array.isArray(cfg.servers) && cfg.servers.length ? cfg.servers : [{ name: "This server" }];
   const servers = list.map((s) => new Server(s));
-  return { clientId: cfg.clientId || "", servers, hasSelf: servers.some((s) => s.isSelf) };
+  return { servers, hasSelf: servers.some((s) => s.isSelf) };
 }
 
 /** Live streams across all servers, in server order. Unreachable servers are skipped. */
