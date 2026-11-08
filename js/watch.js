@@ -1,4 +1,4 @@
-import { watch, makeProbeReader } from "./webrtc.js";
+import { watch, makeProbeReader, listLiveStreams } from "./webrtc.js";
 import { loadConfig, listAllLive } from "./servers.js";
 
 const config = loadConfig();
@@ -202,8 +202,16 @@ const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.fl
 function startStats(key, gen) {
   let prev = null;
   let stalledFor = 0;
+  let viewers = null;     // from the server's stream list (includes you)
+  let viewersAt = 0;
   statsTimer = setInterval(async () => {
     if (gen !== generation || !pc) return;
+    if (!$("stats").hidden && Date.now() - viewersAt > 3000) {
+      viewersAt = Date.now();
+      listLiveStreams()
+        .then((all) => { const s = all.find((x) => x.streamKey === key); viewers = s ? (s.sessions || []).length : null; })
+        .catch(() => {});
+    }
     const report = await pc.getStats();
     let v = null, a = null, pair = null;
     const byId = new Map();
@@ -234,6 +242,7 @@ function startStats(key, gen) {
     const aCodec = a ? byId.get(a.codecId)?.mimeType?.split("/")[1] ?? "?" : "none";
     const rtt = pair?.currentRoundTripTime != null ? Math.round(pair.currentRoundTripTime * 1000) : "?";
     const lines = [
+      `viewers   ${viewers ?? "?"}`,
       `video     ${v.frameWidth ?? "?"}x${v.frameHeight ?? "?"} @ ${Math.round(v.framesPerSecond ?? 0)} fps  ${codec}`,
       `bitrate   ${(kbps / 1000).toFixed(2)} Mbps`,
       `buffer    ${Math.round(jb)} ms (jitter buffer)`,
