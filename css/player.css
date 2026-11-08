@@ -52,6 +52,9 @@ video, canvas { width: 100%; height: 100%; object-fit: contain; display: block; 
 .controls .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .controls .spacer { flex: 1; }
 .controls input[type=range] { width: 100px; accent-color: var(--text); }
+.controls .quality { background: #0008; color: var(--text); border: 1px solid #fff3; border-radius: 6px;
+  padding: 4px 6px; font-size: 13px; cursor: pointer; max-width: 170px; }
+.controls .quality option { background: var(--panel); }
 .live { background: var(--live); font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
 
 .stats { position: absolute; top: 12px; left: 12px; padding: 10px 12px; border-radius: 8px; background: #000b;

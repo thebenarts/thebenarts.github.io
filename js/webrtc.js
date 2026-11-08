@@ -32,6 +32,19 @@ async function negotiate(pc, url, bearer) {
     throw err;
   }
   await pc.setRemoteDescription({ type: "answer", sdp: body });
+  // WHEP session id, e.g. Location: /api/whep/<id> (used to switch simulcast layers).
+  const loc = res.headers.get("Location") || "";
+  pc.sessionId = loc.split("/").filter(Boolean).pop() || "";
+}
+
+/** Ask the server to send this viewer a different simulcast layer (applies at the next keyframe). */
+export async function setVideoLayer(pc, encodingId) {
+  if (!pc?.sessionId) return;
+  await fetch(`${serverBase()}/api/layer/${encodeURIComponent(pc.sessionId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mediaId: "1", encodingId }),
+  });
 }
 
 // Asks the browser to play frames as soon as they are decodable instead of
@@ -60,10 +73,18 @@ export async function watch({ streamKey, onTrack }) {
 }
 
 /** Publish a MediaStream (used by the browser test publisher). */
-export async function publish({ stream, token, maxBitrate = 6_000_000 }) {
+// simulcast: also send half- and quarter-resolution copies, like OBS's simulcast option.
+export async function publish({ stream, token, maxBitrate = 6_000_000, simulcast = false }) {
   const pc = new RTCPeerConnection();
   for (const track of stream.getTracks()) {
-    const sendEncodings = track.kind === "video" ? [{ maxBitrate, maxFramerate: 60 }] : undefined;
+    const sendEncodings = track.kind !== "video" ? undefined
+      : simulcast
+        ? [
+            { rid: "high", maxBitrate, maxFramerate: 60 },
+            { rid: "mid", maxBitrate: maxBitrate / 3, maxFramerate: 60, scaleResolutionDownBy: 2 },
+            { rid: "low", maxBitrate: maxBitrate / 10, maxFramerate: 30, scaleResolutionDownBy: 4 },
+          ]
+        : [{ maxBitrate, maxFramerate: 60 }];
     const tr = pc.addTransceiver(track, { direction: "sendonly", streams: [stream], sendEncodings });
     if (track.kind === "video" && RTCRtpSender.getCapabilities) {
       // Prefer H.264 to match what OBS sends, so the test reflects real playback.

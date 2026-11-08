@@ -1,4 +1,5 @@
-import { watch, makeProbeReader, listLiveStreams } from "./webrtc.js";
+import { watch, makeProbeReader, listLiveStreams, setVideoLayer } from "./webrtc.js";
+import { Quality } from "./quality.js";
 import { loadConfig, listAllLive } from "./servers.js";
 
 const config = loadConfig();
@@ -71,6 +72,36 @@ let generation = 0;     // bumps on every (re)connect so stale attempts bail out
 let retryTimer = 0;
 let statsTimer = 0;
 
+// ---------------- Quality (simulcast layers) ----------------
+let quality = null;     // one per stream; survives reconnects so Auto keeps what it learned
+function qualityFor(key) {
+  if (quality?.key === key) { quality.reset(); return quality; }
+  quality = new Quality({
+    switchTo: (rid) => setVideoLayer(pc, rid),
+    load: () => store.get("quality", "auto"),
+    save: (v) => store.set("quality", v),
+    onUpdate: renderQuality,
+  });
+  quality.key = key;
+  renderQuality();
+  return quality;
+}
+function renderQuality() {
+  const sel = $("quality");
+  sel.hidden = !quality?.available;
+  if (sel.hidden) return;
+  const opts = [["auto", `Auto${quality.choice === "auto" ? ` (${quality.label(quality.rank).split(" ·")[0]})` : ""}`]];
+  quality.layers.forEach((_, i) => opts.push([String(i), quality.label(i)]));
+  // Rebuild only when the text changed, so an open dropdown isn't disturbed every few seconds.
+  const sig = opts.map((o) => o.join("=")).join("|");
+  if (sel.dataset.sig !== sig) {
+    sel.replaceChildren(...opts.map(([v, t]) => new Option(t, v)));
+    sel.dataset.sig = sig;
+  }
+  sel.value = String(quality.choice);
+}
+$("quality").onchange = (e) => quality?.choose(e.target.value === "auto" ? "auto" : +e.target.value);
+
 function setStatus(text, spinning = true) {
   $("status").hidden = !text;
   $("statusText").textContent = text || "";
@@ -92,6 +123,7 @@ async function startPlayer(key) {
   $("title").textContent = key;
   document.title = `${key} · Friendly Streamer`;
   setStatus("Connecting…");
+  qualityFor(key);
 
   const stream = new MediaStream();
   try {
@@ -166,7 +198,7 @@ function toggleFullscreen() {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (stage.hidden || e.target.tagName === "INPUT") return;
+  if (stage.hidden || ["INPUT", "SELECT"].includes(e.target.tagName)) return;
   const k = e.key.toLowerCase();
   if (k === "f") toggleFullscreen();
   else if (k === "m") setMuted(!video.muted);
@@ -203,13 +235,21 @@ function startStats(key, gen) {
   let prev = null;
   let stalledFor = 0;
   let viewers = null;     // from the server's stream list (includes you)
-  let viewersAt = 0;
+  let serverLayer = "";   // the layer the server says it's sending us
+  let polledAt = 0;
   statsTimer = setInterval(async () => {
     if (gen !== generation || !pc) return;
-    if (!$("stats").hidden && Date.now() - viewersAt > 3000) {
-      viewersAt = Date.now();
+    // Every 3 s: viewer count + the stream's simulcast layers from the server's stream list.
+    if (Date.now() - polledAt > 3000) {
+      polledAt = Date.now();
       listLiveStreams()
-        .then((all) => { const s = all.find((x) => x.streamKey === key); viewers = s ? (s.sessions || []).length : null; })
+        .then((all) => {
+          if (gen !== generation) return;
+          const s = all.find((x) => x.streamKey === key);
+          viewers = s ? (s.sessions || []).length : null;
+          serverLayer = (s?.sessions || []).find((x) => x.id === pc?.sessionId)?.videoLayerCurrent || "";
+          if (s) quality.setTracks(s.videoTracks);
+        })
         .catch(() => {});
     }
     const report = await pc.getStats();
@@ -234,8 +274,22 @@ function startStats(key, gen) {
       // Publisher stopped or froze: no new frames for 4s -> reconnect (lands on "waiting").
       stalledFor = v.framesDecoded === prev.framesDecoded ? stalledFor + dt : 0;
       if (stalledFor > 4) { reconnect(key, `${key} paused or ended, reconnecting…`); return; }
+
+      // Auto quality: is the connection losing packets, or the PC failing to decode in time?
+      const dLost = (v.packetsLost ?? 0) - (prev.packetsLost ?? 0);
+      const dRecv = v.packetsReceived - prev.packetsReceived;
+      const dDecoded = v.framesDecoded - prev.framesDecoded;
+      const dDropped = (v.framesDropped ?? 0) - (prev.framesDropped ?? 0);
+      const dDecodeTime = (v.totalDecodeTime ?? 0) - (prev.totalDecodeTime ?? 0);
+      quality.tick({
+        lossRatio: dLost > 0 ? dLost / (dLost + dRecv) : 0,
+        dropRatio: dDropped > 0 ? dDropped / (dDropped + dDecoded) : 0,
+        decodeMs: dDecoded > 0 ? (dDecodeTime / dDecoded) * 1000 : 0,
+        frameMs: v.framesPerSecond ? 1000 / v.framesPerSecond : 0,
+      });
     }
     prev = v;
+    if (serverLayer && serverLayer === quality.requested) quality.learn(serverLayer, v.frameHeight);
 
     if ($("stats").hidden) return;
     const codec = byId.get(v.codecId)?.mimeType?.split("/")[1] ?? "?";
@@ -243,6 +297,7 @@ function startStats(key, gen) {
     const rtt = pair?.currentRoundTripTime != null ? Math.round(pair.currentRoundTripTime * 1000) : "?";
     const lines = [
       `viewers   ${viewers ?? "?"}`,
+      `quality   ${quality.summary}${serverLayer ? `  (layer "${serverLayer}")` : ""}`,
       `video     ${v.frameWidth ?? "?"}x${v.frameHeight ?? "?"} @ ${Math.round(v.framesPerSecond ?? 0)} fps  ${codec}`,
       `bitrate   ${(kbps / 1000).toFixed(2)} Mbps`,
       `buffer    ${Math.round(jb)} ms (jitter buffer)`,
