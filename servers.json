@@ -3,6 +3,10 @@
                     {
                         "name":  "Ben",
                         "url":  "https://bensfriendlystream.duckdns.org:8080"
+                    },
+                    {
+                        "name":  "Edmond",
+                        "url":  "https://edfriendlystream.duckdns.org:8080"
                     }
                 ]
 }
