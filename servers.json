@@ -7,6 +7,10 @@
                     {
                         "name":  "Edmond",
                         "url":  "https://edfriendlystream.duckdns.org:8080"
-                    }
+                    },
+                    {
+                        "name":  "Bence",
+                        "url":  "https://bencestream.duckdns.org:8443"
+                    },
                 ]
 }
