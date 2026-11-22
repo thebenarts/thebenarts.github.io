@@ -1,16 +1,12 @@
 {
     "servers":  [
                     {
-                        "name":  "Ben",
-                        "url":  "https://bensfriendlystream.duckdns.org:8080"
+                        "name":  "Bence",
+                        "url":  "https://bencestream.duckdns.org:8443"
                     },
                     {
                         "name":  "Edmond",
                         "url":  "https://edfriendlystream.duckdns.org:8080"
-                    },
-                    {
-                        "name":  "Bence",
-                        "url":  "https://bencestream.duckdns.org:8443"
-                    },
+                    }
                 ]
 }
